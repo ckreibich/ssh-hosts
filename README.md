@@ -54,7 +54,7 @@ Let's say you want to list all of the piggy hosts:
 
 Now you want to pull up all hosts for which you have port forwarding enabled. You use the -g flag to enable global matching on all words of the host spec:
 
-    ssh-hosts -g *Forward
+    $ ssh-hosts -g *Forward
     Host piggy1
     ForwardX11 yes
     HostName piggy1.test.example.com
