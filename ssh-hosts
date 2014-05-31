@@ -1,0 +1,197 @@
+#! /usr/bin/env python
+"""
+A script for parsing and querying hosts configured in ~/.ssh/config.
+"""
+# Copyright 2014 Christian Kreibich. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are
+# met:
+#
+#    1. Redistributions of source code must retain the above copyright
+#       notice, this list of conditions and the following disclaimer.
+#
+#    2. Redistributions in binary form must reproduce the above
+#       copyright notice, this list of conditions and the following
+#       disclaimer in the documentation and/or other materials provided
+#       with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
+# WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+# MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY DIRECT,
+# INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+# STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING
+# IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+#
+import argparse
+import copy
+import fnmatch
+import os.path
+import sys
+
+class SshHost(object):
+    """
+    Representation of a single host as specified in the config file.
+    """
+    def __init__(self):
+        self.name = None
+        self._props = {}
+
+    def __str__(self):
+        res = ['Host ' + self.name]
+        for key, val in self._props.items():
+            res.append(key + ' ' + val)
+        return '\n'.join(res)
+
+    def set(self, key, val):
+        """Sets a key/val pair for this host spec."""
+        self._props[key] = val
+
+    def keys(self):
+        """Returns all keys of this host spec, alphabetically sorted."""
+        return sorted(self._props.keys())
+
+    def get(self, key):
+        """
+        Returns the value of a key in this host spec, or None if this
+        key isn't defined.
+        """
+        try:
+            return self._props[key]
+        except KeyError:
+            return None
+
+    def does_match(self, pat, keys=True, vals=True):
+        """
+        Predicate, returns True iff the given pattern can be found as
+        a substring in the keys/vals of this host spec. You can turn
+        key/val search on/off via the keys/vals arguments.
+        """
+        if self.name is not None and fnmatch.fnmatch(self.name, pat):
+            return True
+        if not keys and not vals:
+            return False
+        for key, val in self._props.items():
+            if keys and fnmatch.fnmatch(key, pat):
+                return True
+            if vals and fnmatch.fnmatch(val, pat):
+                return True
+            if keys and vals and fnmatch.fnmatch(key + " " + val, pat):
+                return True
+        return False
+
+
+class SshConfig(object):
+    """
+    Representation of an SSH config file, usually ~/.ssh/config.
+    """
+    def __init__(self, filename):
+        self._filename = filename
+        self._hosts = {}
+
+    def parse(self):
+        """
+        Parses the given config file. Returns True iff successful.
+        """
+        if not os.path.exists(self._filename):
+            return False
+
+        with open(self._filename) as hdl:
+            names = None
+            host = SshHost()
+            for line in hdl:
+                line = line.split('#', 1)[0]
+                line = line.strip()
+                # We don't support the = form right now:
+                try:
+                    key, val = line.split(None, 1)
+                except ValueError:
+                    # Not a line that has key/val pair
+                    continue
+                if key.lower() == 'host':
+                    if names is not None:
+                        for name in names:
+                            ssh_host = copy.deepcopy(host)
+                            ssh_host.name = name
+                            self._hosts[name] = ssh_host
+                    names = val.split()
+                    host = SshHost()
+                    continue
+                host.set(key, val)
+            if names is not None:
+                for name in names:
+                    ssh_host = copy.deepcopy(host)
+                    ssh_host.name = name
+                    self._hosts[name] = ssh_host
+
+        return True
+
+    def get_host(self, name):
+        """
+        Returns SshHost instance for host of given name. Return None
+        on error.
+        """
+        try:
+            return self._hosts[name]
+        except KeyError:
+            return None
+
+    def get_hostnames(self):
+        """
+        Returns all configured hostnames, alphabetically sorted.
+        """
+        return sorted(self._hosts.keys())
+
+def main():
+    """
+    Main function. Returns 0 if successful, 1 otherwise.
+    """
+    defaultfile = os.path.join(os.path.expanduser('~'), '.ssh', 'config')
+    descr = """
+Helper script for inspecting hosts in an SSH config file.  You can
+express search patterns in familiar UNIX shell format, such as "foo*"
+for anything starting with "foo", "*foo*" for anything containing
+"foo", etc. The tool will print in full any host specs that match. By
+default, only host names defined via the "Host" keyword get
+matched. If you use -g, ssh-hosts matches against every string in the
+host spec. The tool only does syntactical matching. For example, if
+you have a "Host *" spec, it will not get semantically applied to the
+subsequent specs.
+"""
+    parser = argparse.ArgumentParser(description=descr)
+    parser.add_argument('-f', '--file', default=defaultfile,
+                        help='SSH config file to process')
+    parser.add_argument('-g', '--global', action='store_true', dest='glob',
+                        help='Search for patterns globally in a host spec')
+    parser.add_argument('hosts', metavar='hosts', nargs='*',
+                        help='host names to look up')
+    args = parser.parse_args()
+
+    ssh_config = SshConfig(args.file)
+    if not ssh_config.parse():
+        return 1
+    res = []
+
+    for host in ssh_config.get_hostnames():
+        host = ssh_config.get_host(host)
+        if host is None:
+            continue
+        if len(args.hosts) == 0:
+            res.append(str(host))
+        else:
+            keys, vals = (True, True) if args.glob else (False, False)
+            for pat in args.hosts:
+                if host.does_match(pat, keys, vals):
+                    res.append(str(host))
+    if len(res) > 0:
+        print '\n\n'.join(res)
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
