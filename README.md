@@ -66,7 +66,7 @@ Now you want to pull up all hosts for which you have port forwarding enabled. Yo
     HostName piggy2.test.example.com
     LocalForward 8080 kermit.example.com:8080
 
-Which hosts live in the test.example.com subdomain?
+Which hosts live in the test.example.com subdomain? Multi-word searches with glob patterns work too:
 
     $ ssh-hosts -f example.config -g "HostName *.test.example.com"
     Host gonzo
@@ -83,7 +83,7 @@ Which hosts live in the test.example.com subdomain?
     HostName piggy2.test.example.com
     LocalForward 8080 kermit.example.com:8080
 
-And, finally, you want to know the list of machines that you log into as user henson. Multi-word searches work too:
+And, finally, you want to know the list of machines that you log into as user henson.
 
     $ ssh-hosts -g "User henson"
     Host kermit
