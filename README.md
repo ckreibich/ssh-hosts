@@ -68,7 +68,7 @@ Now you want to pull up all hosts for which you have port forwarding enabled. Yo
 
 Which hosts live in the test.example.com subdomain? Multi-word searches with glob patterns work too:
 
-    $ ssh-hosts -f example.config -g "HostName *.test.example.com"
+    $ ssh-hosts -g "HostName *.test.example.com"
     Host gonzo
     HostName gonzo.test.example.com
 
