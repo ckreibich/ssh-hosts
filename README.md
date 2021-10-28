@@ -8,6 +8,11 @@ Features
 
 * UNIX glob-style matching on host names or any part of a host specification
 
+Deficiencies
+------------
+
+* Doesn't currently support config file includes
+
 Examples
 --------
 

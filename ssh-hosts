@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 """
 A script for parsing and querying hosts configured in ~/.ssh/config.
 """
@@ -189,7 +189,7 @@ subsequent specs.
                 if host.does_match(pat, keys, vals):
                     res.append(str(host))
     if len(res) > 0:
-        print '\n\n'.join(res)
+        print('\n\n'.join(res))
     return 0
 
 
